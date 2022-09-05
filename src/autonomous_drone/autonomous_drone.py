@@ -14,6 +14,12 @@ class AutonomousDrone:
 
         self.frame_read = self.tello.get_frame_read()
 
+        first_frame = self.__resize_frame(self.get_frame())
+        self.W = first_frame.shape[1]
+        self.H = first_frame.shape[0]
+        self.center_x = int(self.W/2)
+        self.center_y = int(self.H/2)
+
         self.pose_model = Body('./res/model/body_pose_model.pth')
 
         self.wait = NonBlockingWait()
@@ -22,9 +28,6 @@ class AutonomousDrone:
     def takeoff(self):
         self.tello.takeoff()
         self.wait.wait_millis(3000)
-
-    def land(self):
-        pass
 
     def get_frame(self):
         return self.frame_read.frame
@@ -51,28 +54,45 @@ class AutonomousDrone:
                     keypoints[idx] = (int(x), int(y))
         return keypoints
 
+    # Drone motor speeds between -100~100
     def calc_speeds(self, keypoints: List[Tuple]) -> List[int]:
-        pass
+        left_right = 0
+        for_back = 0
+        up_down = 0
+        yaw = 0
+
+        nose_keypoint = keypoints[0]
+        if nose_keypoint is not None:
+            nose_x, nose_y = nose_keypoint
+
+            diff_x = (nose_x - self.center_x)/(self.W/2)
+            diff_y = (self.center_y - nose_y)/(self.H/2)
+
+            up_down = diff_y * 50
+
+
+        return [int(left_right), int(for_back), int(up_down), int(yaw)]
 
     def update_motor_speeds(self, speeds: List[int]):
-        pass
+        self.tello.send_rc_control(speeds[0], speeds[1], speeds[2], speeds[3])
 
     def run(self, debug=False):
-        # self.takeoff()
+        self.takeoff()
 
         while self.SHOULD_RUN:
             frame = self.get_frame()
             frame = self.__resize_frame(frame)
 
-            keypoints = self.predict_pose(frame=frame)
+            if self.wait.has_time_passed():
+                keypoints = self.predict_pose(frame=frame)
+                speeds = self.calc_speeds(keypoints=keypoints)
+                self.update_motor_speeds(speeds=speeds)
 
-            if debug:
-                for point in keypoints:
-                    if point is not None:
-                        cv2.circle(frame, (point[0], point[1]), 4, (253, 1, 36), thickness=-1)
-
-            speeds = self.calc_speeds(keypoints=keypoints)
-            # self.update_motor_speeds(speeds=speeds)
+                if debug:
+                    for point in keypoints:
+                        if point is not None:
+                            cv2.circle(frame, (point[0], point[1]), 4, (253, 1, 36), thickness=-1)
+                    cv2.circle(frame, (self.center_x, self.center_y), 4, (0, 0, 255), thickness=-1)
 
             cv2.imshow('Drone View', frame)
             k = cv2.waitKey(1)

@@ -5,6 +5,14 @@ from djitellopy import Tello
 from src.pose_detection.body import Body
 
 
+def __resize_frame(self, frame):
+    scale_percent = 20  # percent of original size
+    width = int(frame.shape[1] * scale_percent / 100)
+    height = int(frame.shape[0] * scale_percent / 100)
+    dim = (width, height)
+    return cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
+
+
 def predict_pose(model, img):
     keypoints_to_track = [0]
     keypoints = [None for i in range(len(keypoints_to_track))]
@@ -29,7 +37,7 @@ cap.set(4, 120)
 while True:
     ret, oriImg = cap.read()
     # candidate, subset = body_estimation(oriImg)
-    canvas = copy.deepcopy(oriImg)
+    # canvas = copy.deepcopy(oriImg)
     # # NOSE 0
     # # CHEST 1
     #
