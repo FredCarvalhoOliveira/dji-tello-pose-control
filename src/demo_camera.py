@@ -8,14 +8,6 @@ body_estimation = Body('../res/model/body_pose_model.pth')
 
 print(f"Torch device: {torch.cuda.get_device_name()}")
 
-send_rc_control = False
-
-tello = Tello()
-tello.connect()
-tello.set_speed(10)
-tello.streamoff()
-tello.streamon()
-
 cap = cv2.VideoCapture(1)
 cap.set(3, 160)
 cap.set(4, 120)
@@ -42,7 +34,6 @@ while True:
 
             diff_x = (x - center_x)/(oriImg.shape[1]/2)
             diff_y = (center_y - y)/(oriImg.shape[0]/2)
-            print(diff_y)
 
     cv2.imshow('demo', canvas)
     if cv2.waitKey(1) & 0xFF == ord('q'):
