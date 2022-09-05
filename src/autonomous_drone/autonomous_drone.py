@@ -1,5 +1,6 @@
 from djitellopy import Tello
 from src.pose_detection.body import Body
+from src.autonomous_drone.non_blocking_wait import NonBlockingWait
 
 class AutonomousDrone:
     def __init__(self):
@@ -11,8 +12,11 @@ class AutonomousDrone:
 
         self.body_estimation = Body('../res/model/body_pose_model.pth')
 
+        self.wait = NonBlockingWait()
+
     def takeoff(self):
-        pass
+        self.tello.takeoff()
+        self.wait.wait_millis(3000)
 
     def land(self):
         pass
