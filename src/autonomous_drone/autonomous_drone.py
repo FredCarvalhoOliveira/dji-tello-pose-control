@@ -14,7 +14,7 @@ class AutonomousDrone:
 
         self.frame_read = self.tello.get_frame_read()
 
-        first_frame = self.__resize_frame(self.get_frame())
+        first_frame = self.__resize_frame(self.get_frame(), width=160)
         self.W = first_frame.shape[1]
         self.H = first_frame.shape[0]
         self.center_x = int(self.W/2)
@@ -38,6 +38,15 @@ class AutonomousDrone:
         height = int(frame.shape[0] * scale_percent / 100)
         dim = (width, height)
         return cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
+
+    def __resize_frame(self, frame, width: int, inter=cv2.INTER_AREA):
+        (h, w) = frame.shape[:2]
+
+        r = width / float(w)
+        dim = (width, int(h * r))
+
+        resized = cv2.resize(frame, dim, interpolation=inter)
+        return resized
 
     def predict_pose(self, frame) -> List[Optional[Tuple[int, int]]]:
         keypoints_to_track = [0]
@@ -68,7 +77,8 @@ class AutonomousDrone:
             diff_x = (nose_x - self.center_x)/(self.W/2)
             diff_y = (self.center_y - nose_y)/(self.H/2)
 
-            up_down = diff_y * 50
+            left_right = diff_x * 40
+            up_down = diff_y * 60
 
 
         return [int(left_right), int(for_back), int(up_down), int(yaw)]
@@ -81,7 +91,7 @@ class AutonomousDrone:
 
         while self.SHOULD_RUN:
             frame = self.get_frame()
-            frame = self.__resize_frame(frame)
+            frame = self.__resize_frame(frame, width=160)
 
             if self.wait.has_time_passed():
                 keypoints = self.predict_pose(frame=frame)
@@ -93,7 +103,9 @@ class AutonomousDrone:
                         if point is not None:
                             cv2.circle(frame, (point[0], point[1]), 4, (253, 1, 36), thickness=-1)
                     cv2.circle(frame, (self.center_x, self.center_y), 4, (0, 0, 255), thickness=-1)
-
+                    frame = self.__resize_frame(frame, width=720)
+                    text = "Battery: {}%".format(self.tello.get_battery())
+                    cv2.putText(frame, text, (5, 720 - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             cv2.imshow('Drone View', frame)
             k = cv2.waitKey(1)
             if k == ord('q'):
