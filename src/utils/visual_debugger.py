@@ -20,5 +20,17 @@ class VisualDebugger:
                 pt_coords = (int(pt[0] * frame.shape[1]), int(pt[1] * frame.shape[0]))
                 frame = cv2.rectangle(frame, ref_pt_coords, pt_coords, sec_color, thickness)
                 frame = cv2.line(frame, ref_pt_coords, pt_coords, color, thickness)
+
+                offset = (pt_coords[0] - ref_pt_coords[0])/2
+                # TODO MAKE THIS BETTER
+                offset_str = str(round(pt[0] - ref_point[0], 3))
+                frame = cv2.putText(frame,
+                                    str(round(pt[0] - ref_point[0], 3)),
+                                    (int(ref_pt_coords[0] + offset) - len(offset_str), pt_coords[1] + 15),
+                                    cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.5,
+                                    sec_color,
+                                    1,
+                                    cv2.LINE_AA)
         return frame
 
