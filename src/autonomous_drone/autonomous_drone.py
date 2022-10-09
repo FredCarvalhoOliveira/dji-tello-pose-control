@@ -1,8 +1,11 @@
 from djitellopy import Tello
 from src.pose_detection.body import Body
-from src.autonomous_drone.non_blocking_wait import NonBlockingWait
+from src.utils.non_blocking_wait import NonBlockingWait
+from src.utils.utils import normalize_points, resize
+from src.utils.visual_debugger import VisualDebugger
 from typing import List, Tuple, Optional
 import cv2
+
 
 class AutonomousDrone:
     def __init__(self):
@@ -14,11 +17,7 @@ class AutonomousDrone:
 
         self.frame_read = self.tello.get_frame_read()
 
-        first_frame = self.__resize_frame(self.get_frame(), width=160)
-        self.W = first_frame.shape[1]
-        self.H = first_frame.shape[0]
-        self.center_x = int(self.W/2)
-        self.center_y = int(self.H/2)
+        self.center = (0.5, 0.5)
 
         self.pose_model = Body('./res/model/body_pose_model.pth')
 
@@ -32,23 +31,7 @@ class AutonomousDrone:
     def get_frame(self):
         return self.frame_read.frame
 
-    def __resize_frame(self, frame):
-        scale_percent = 20  # percent of original size
-        width = int(frame.shape[1] * scale_percent / 100)
-        height = int(frame.shape[0] * scale_percent / 100)
-        dim = (width, height)
-        return cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
-
-    def __resize_frame(self, frame, width: int, inter=cv2.INTER_AREA):
-        (h, w) = frame.shape[:2]
-
-        r = width / float(w)
-        dim = (width, int(h * r))
-
-        resized = cv2.resize(frame, dim, interpolation=inter)
-        return resized
-
-    def predict_pose(self, frame) -> List[Optional[Tuple[int, int]]]:
+    def predict_pose(self, frame) -> List[Optional[Tuple[float, float]]]:
         keypoints_to_track = [0]
         keypoints = [None for i in range(len(keypoints_to_track))]
         candidate, subset = self.pose_model(frame)
@@ -61,10 +44,10 @@ class AutonomousDrone:
                 if point_idx != -1:
                     x, y = candidate[point_idx][0:2]
                     keypoints[idx] = (int(x), int(y))
-        return keypoints
+        return normalize_points(points=keypoints, frame=frame)
 
     # Drone motor speeds between -100~100
-    def calc_speeds(self, keypoints: List[Tuple]) -> List[int]:
+    def calc_speeds(self, keypoints: List[Optional[Tuple[float, float]]]) -> List[int]:
         left_right = 0
         for_back = 0
         up_down = 0
@@ -74,12 +57,11 @@ class AutonomousDrone:
         if nose_keypoint is not None:
             nose_x, nose_y = nose_keypoint
 
-            diff_x = (nose_x - self.center_x)/(self.W/2)
-            diff_y = (self.center_y - nose_y)/(self.H/2)
+            diff_x = nose_x - self.center[0]
+            diff_y = self.center[1] - nose_y
 
             left_right = diff_x * 40
             up_down = diff_y * 60
-
 
         return [int(left_right), int(for_back), int(up_down), int(yaw)]
 
@@ -90,8 +72,9 @@ class AutonomousDrone:
         self.takeoff()
 
         while self.SHOULD_RUN:
-            frame = self.get_frame()
-            frame = self.__resize_frame(frame, width=160)
+            original_frame = self.get_frame()
+            frame = resize(original_frame, width=160)
+            debug_frame = original_frame.copy()
 
             if self.wait.has_time_passed():
                 keypoints = self.predict_pose(frame=frame)
@@ -99,14 +82,13 @@ class AutonomousDrone:
                 self.update_motor_speeds(speeds=speeds)
 
                 if debug:
-                    for point in keypoints:
-                        if point is not None:
-                            cv2.circle(frame, (point[0], point[1]), 4, (253, 1, 36), thickness=-1)
-                    cv2.circle(frame, (self.center_x, self.center_y), 4, (0, 0, 255), thickness=-1)
-                    frame = self.__resize_frame(frame, width=720)
+                    debug_frame = VisualDebugger.draw_offsets(debug_frame, ref_point=(0.5, 0.5), points=keypoints)
+                    debug_frame = VisualDebugger.draw_keypoints(debug_frame, keypoints)
+
                     text = "Battery: {}%".format(self.tello.get_battery())
-                    cv2.putText(frame, text, (5, 720 - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            cv2.imshow('Drone View', frame)
+                    print(text)
+                    cv2.putText(debug_frame, text, (50, 50 - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            cv2.imshow('Drone View', debug_frame)
             k = cv2.waitKey(1)
             if k == ord('q'):
                 break

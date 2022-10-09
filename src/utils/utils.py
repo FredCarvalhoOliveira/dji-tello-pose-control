@@ -1,7 +1,8 @@
 import cv2
+from typing import List, Optional, Tuple
 
 
-def normalize_points(points, frame):
+def normalize_points(points, frame) -> List[Optional[Tuple[float, float]]]:
     norm_points = [None for i in range(len(points))]
     for idx, point in enumerate(points):
         if point is not None:
